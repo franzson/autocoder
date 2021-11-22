@@ -84,7 +84,7 @@ The eight values are dependent on each other, changing one affects what the othe
 
 By feeding arbitrary values as input into the latent vector layer, the encoder returns a new mel frame that represents an unseen point within the spectral space of the training data. The frame is translated from mel to  spectrum via a matrix multiplication––this is the main bottleneck in the algorithm––and can then be used in any number of ways, e.g. for synthesis or convolution, as an impulse response in a hybrid reverb, or for cross–synthesis.
 
-#1. generative synthesis
+# 1. generative synthesis
 
 A continuous soundscape––based upon the training data––can be produced by generating a random walk for each value in the latent vector and then decoding the latent vector into a spectral frame. The resulting spectrum is then synthesized by randomizing the phase and taking the inverse FFT of the frame.
 
