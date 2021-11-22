@@ -1,3 +1,3 @@
 # autocoder
 
-![alt text](https://github.com/franzson/autocoder/images/autocoder.001.jpg?raw=true)
+![alt text](https://github.com/franzson/autocoder/blob/main/images/autocoder.001.jpeg)
