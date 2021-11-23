@@ -34,6 +34,8 @@ A very simple Max/MSP demo patch is included in /maxmsp. This patch requires spa
 
 A google colab (https://colab.research.google.com/) training script is included in /colab. You can use a chrome extension called 'Open in Colab'  to move the script over.  It is highly recommended to use colab for any heavier training as cpu training can be relatively slow.
 
+A test model is included in /models
+
 # autoencoders
 
 An autoencoder is a neural network that takes an input, runs it through one or more hidden layers and reproduces the input as accurately as it can. It can be described as a same-in-same-out structure where a compressed representation of the training data is learnt by the model.
