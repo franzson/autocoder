@@ -7,6 +7,8 @@ import pyaudio
 import time
 import random
 
+np.set_printoptions(formatter={'float': lambda x: "{0:0.3f}".format(x)})
+
 #internal_vector = 0
 #brightness_ = 0
 #smooth = 0
@@ -103,19 +105,43 @@ def callback(in_data, frame_count, time_info, status):
     sout = np.add(sout, cs)[0,]
     return(np.multiply(sout[0:frame_count].astype(np.float32), 250.), pyaudio.paContinue)
 
-def autocode(in_data, offset, scale):
+min_a = np.zeros(8)
+max_a = np.zeros(8)
+min_a.fill(1000000)
+max_a.fill(-1000000)
+
+def autocode_norm_factors(in_data):
+    global min_a
+    global max_a
+
+    amp, ph, norm_factor = ac.analyze_normalized(in_data, window, mel_filter)
+    in_data = ac.encode(encoder, deep, scale_mult, scale_subtract, amp)
+    t = np.zeros((2, 8))
+    t[0,] = in_data
+    t[1,] = min_a
+    min_a = np.amin(t, axis = 0)
+    t[1,] = max_a
+    max_a = np.amax(t, axis = 0)
+
+
+
+def autocode(in_data, offset, scale, reorder, norm_min, norm_max):
 
     global smooth
     global ca
     global brightness_
 
     # DECODE
-    # REPLACE THIS ONE WITH THE VECTOR GENERATED FROM THE INPUT
     amp, ph, norm_factor = ac.analyze_normalized(in_data, window, mel_filter)
     in_data = ac.encode(encoder, deep, scale_mult, scale_subtract, amp)
+    in_data = np.divide(np.subtract(in_data,norm_min), np.subtract(norm_max, norm_min))
+
+
     in_data = in_data[reorder]
-    in_data = np.add(np.multiply(in_data, invert_mult), invert_add)
-    in_data = np.clip(np.add(np.add(np.multiply(np.subtract(in_data, .5), scale), .5), offset), 0, 1)
+    #in_data = np.add(np.multiply(in_data, invert_mult), invert_add)
+    in_data = np.clip(np.add(np.multiply(in_data, scale), offset), 0, 1)
+    print(in_data)
+    #print(np.add(np.multiply(in_data, scale), offset))
     p_m = np.multiply(ac.decode(decoder, deep, scale_mult, scale_subtract, in_data), norm_factor)
     ca = np.zeros((1, int(fftsize / 2 + 1)), dtype=np.float32)
     ca[0,0:int(fftsize/2)] = p_m.dot(mel_inversion_filter)
@@ -284,32 +310,37 @@ elif(sys.argv[1] == "-autocode" or sys.argv[1] == "-a"):
     mel_filter, mel_inversion_filter, window = ac.initialize(fftsize, input_dim)
 
     reorder = np.zeros((encoded_dim), dtype = np.int)
-    invert_mult = np.zeros((encoded_dim), dtype = np.int)
-    invert_add = np.zeros((encoded_dim), dtype = np.int)
+    scale = np.zeros((encoded_dim), dtype = np.float32)
+    offset = np.zeros((encoded_dim), dtype = np.float32)
+
 
     for i in range(0, encoded_dim):
         reorder[i] = int(sys.argv[6 + i])
-        if(int(sys.argv[6 + i]) > 0):
-            invert_mult[i] = 1
-        else:
-            invert_mult[i] = -1
-            invert_add[i] = 1
-
-    reorder = np.subtract(np.abs(reorder), 1)
+        scale[i] = float(sys.argv[6 + encoded_dim + i])
+        offset[i] = float(sys.argv[6 + encoded_dim + encoded_dim + i])
 
 
+    #reorder = np.subtract(np.abs(reorder), 1)
 
     # READ THE WAVEFILE
     wavefile = ac.readwave(input_filename)
 
     n = int((wavefile.shape[0] - fftsize) / windowskip)
 
-    reconstructed = np.zeros((n, fftsize))
-
-
     for i in range(n):
         # 2. GET THE GRAIN AND WINDOW IT
-        reconstructed[i,] = autocode(np.multiply(wavefile[(i * windowskip):((i * windowskip)+ fftsize)], window), offset, scale)
+        autocode_norm_factors(np.multiply(wavefile[(i * windowskip):((i * windowskip)+ fftsize)], window))
+
+    #np.divide(np.subtract(a, np.amin(a,axis=0)), np.subtract(np.amax(a, axis = 0), np.amin(a, axis = 0)))
+    #quit()
+
+    reconstructed = np.zeros((n, fftsize))
+
+    # NORMALIZE THE INPUT
+    for i in range(n):
+        # 2. GET THE GRAIN AND WINDOW IT
+        reconstructed[i,] = autocode(np.multiply(wavefile[(i * windowskip):((i * windowskip)+ fftsize)], window), offset, scale, reorder, min_a, max_a)
+
 
     output = np.zeros(reconstructed.shape[0] * windowskip + fftsize)
 
