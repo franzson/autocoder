@@ -4,6 +4,9 @@ The autocoder package is an implementation of a variational autoencoder––a n
 
 # installation
 
+If all you want to do is try out training and working with models, please
+see [here](https://github.com/franzson/autocoder_external).
+
 For basic usage, you will need python 3.7+, Tensorflow and Numpy
 Tensorflow 2.4+
 	Mac OS 12+: https://developer.apple.com/metal/tensorflow-plugin/
