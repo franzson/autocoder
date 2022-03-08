@@ -2,10 +2,11 @@
 
 The autocoder package is an implementation of a variational autoencoder––a neural network capable of learning a spectral representation of a soundfile and synthesizing a novel output based on the trained model. It provides an easily extendable ecosystem to assist with the experimentation and development of sound software and hardware based on the underlying neural network architecture.
 
+# If all you want to do is try out training and working with models in Max/MSP, please see [here](https://github.com/franzson/autocoder_external).
+
 # installation
 
-If all you want to do is try out training and working with models in Max/MSP, please
-see [here](https://github.com/franzson/autocoder_external).
+The following is for installing the full autocoder toolchain. This is only recommended if you intend to do research or development based on the autocoder toolchain.
 
 For basic usage, you will need python 3.7+, Tensorflow and Numpy
 Tensorflow 2.4+
