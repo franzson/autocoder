@@ -90,58 +90,6 @@ The eight values are dependent on each other, changing one affects what the othe
 
 By feeding arbitrary values as input into the latent vector layer, the encoder returns a new mel frame that represents an unseen point within the spectral space of the training data. The frame is translated from mel to  spectrum via a matrix multiplication––this is the main bottleneck in the algorithm––and can then be used in any number of ways, e.g. for synthesis or convolution, as an impulse response in a hybrid reverb, or for cross–synthesis.
 
-# 1. generative synthesis
-
-A continuous soundscape––based upon the training data––can be produced by generating a random walk for each value in the latent vector and then decoding the latent vector into a spectral frame. The resulting spectrum is then synthesized by randomizing the phase and taking the inverse FFT of the frame.
-
-If the step size of the random walk produces undesirable discontinuities in the output, spectral domain low pass filtering can be applied. 
-
-	EXAMPLES
-
-# 2. REVERB/FILTERING
-
-The network can also be used to convert a discrete input space into a continuous one. For example, a set of reverb impulses (the amplitude, not phase) can be fed as training data to the model, producing a continuous space that can be used for the filtering stage in a hybrid reverb algorithm. 
-
-This generates new unheard spaces in-between the original impulses, as well as offering the ability to dynamically morph between discrete spaces.
-
-	EXAMPLE
-
-Similarly, a generative virtual resonance body for an instrument could be produced from a number of real-world and synthetic responses, creating new hybrids as well as hybrid analog/virtual instruments where the resonant response of the instrument shifts dynamically in time.
-
-Models used for generative synthesis can also be used for the filtering stage, resulting in a cross synthesis where the carrier signal is generative and dynamic within the space defined by the training data.
-
-	EXAMPLE
-
-By whitening the modulator spectrum––i.e. normalizing the frame to 0 to 1 and then setting it to a fractional power––the need for loud bins to align for a signal to be produced can be mitigated and a more forgiving imprint of the modulator on the carrier can be produced. 
-
-	EXAMPLE
-
-By stringing a few of these together, extended reverb tails that change and morph in–time can be achieved.
-
-# 3.autocoding
-
-A more direct form of cross synthesis can be produced by feeding a different input sound into the encoder, producing a latent representation of that new input sound as heard by the AI. Since the AI only knows how to hear things based on its training data, a hybrid sound can in theory be produced. In reality, it is highly unlikely that the latent vector representations even as much as overlap, so the latent representation of the new input must be offset, clipped and scaled. This representation can then be decoded, effectively skinning the input sound with parts of the sound that the original model is based on.
-
-	EXAMPLE
-
-Since this isn't a theoretically rigorous approach in the first place, the mapping of the different dimensions of the latent vector of the input sound can be scrambled and the dimensions themselves inverted, producing numerous variants of the original input.
-
-	EXAMPLES
-
-# 4. further work
-
-Given that the latent vector encodes a smooth representation of the training data, distances in the latent layer can be used as proxies for distances in the training data, allowing us to calculate the similarities between any two sounds––or rather between the spectral representations of any two sounds––by calculating the euclidian distance between their latent representations. These similarity judgements could be used for concatenative synthesis, granular synthesis based on similarities between spectral frames, as well as larger scale compositional judgements based on relationships between sounds along the dimensions of the latent vector.
-
-Training parameters can also be used creatively. In my experience, smaller batch sizes––i.e. the number of examples from the training set shown to the model at a time––tend to produce models that focus on individual sound components, while larger batch sizes are less detail oriented and try to find shortcuts to represent the data. Taking advantage of the larger model shortcutting, latent spectral/harmonic structures between the sounds can emerge––i.e. feeding a complete chromatic set of all string instruments  as a training set and training with a large batch size seems to lead to a harmony based on the overtones present in the string sounds to emerge rather than the ability to produce each pitch separately, although this is not the case for every round of training.
-
-This code for granular synthesis and distance calculations is still under very active development and is therefor still buggy, and should not be expected to stay consistent or even return consistent returns.
-
-The similarity algorithm can also be repurposed to operate on time-series rather than spectral data which then can be used to generate control envelopes using concatenative or granular synthesis to resynthesize the output of the model into a continuous signal.
-
-Currently we are developing a synthetic body for the Halldorophone as well as a eurorack module based implementation of the convolution algorithm.
-
-As the network architecture is fairly simple, training times on google colab are roughly equal to the duration of the input sound for a lower resolution model with batch size set to 256, and around 3x the duration of the input for a more detailed model. With batch size set to 4096, the training time of a lower quality model drops to less than 25% of the original duration.
-
 # usage
 
 The various scripts use the name of the original sound file as a way of keeping track of various specialized files between functions.
@@ -176,8 +124,17 @@ The resulting models can then be used with either ./autocoder_generate.py and ./
 
 To run the max/msp examples, first run python3 ./autocoder_remote.py 4013 4061 and then load the patch.
 
+Code for granular synthesis and distance calculations is still under very active development and is therefor still buggy, and should not be expected to stay consistent or even return consistent returns.
+
+The similarity algorithm can also be repurposed to operate on time-series rather than spectral data which then can be used to generate control envelopes using concatenative or granular synthesis to resynthesize the output of the model into a continuous signal.
+
+Currently we are developing a synthetic body for the Halldorophone as well as a eurorack module based implementation of the convolution algorithm.
+
+
 # training
 
 The training parameters are set to construct a relatively good generative model from a well structured input, i.e. a song or another piece where pitch relationships are concurrent. For unstructured models, i.e. large sample sets of shorter sounds–– try using deep learning and increase the amount of training by increasing the regression patience.
 
 Lowering the batch size will allow the model to learn more detail at the cost of larger relationships, i.e. learns sine wave like features rather than sound mass like features. Higher batch sizes train much faster and are good for quickly getting a sense of what the model will learn.
+
+As the network architecture is fairly simple, training times on google colab are roughly equal to the duration of the input sound for a lower resolution model with batch size set to 256, and around 3x the duration of the input for a more detailed model. With batch size set to 4096, the training time of a lower quality model drops to less than 25% of the original duration.
