@@ -122,14 +122,13 @@ python3 ./autocoder_analyze.py -d 'input_file.wav' n_of_most_similar
 
 The resulting models can then be used with either ./autocoder_generate.py and ./autocoder_remote.py
 
-To run the max/msp examples, first run python3 ./autocoder_remote.py 4013 4061 and then load the patch.
+To run the osc based max/msp examples, first run python3 ./autocoder_remote.py 4013 4061 and then load the patch. A better way to interface with Max is to use the [autocoder external](https://github.com/franzson/autocoder_external).
 
 Code for granular synthesis and distance calculations is still under very active development and is therefor still buggy, and should not be expected to stay consistent or even return consistent returns.
 
-The similarity algorithm can also be repurposed to operate on time-series rather than spectral data which then can be used to generate control envelopes using concatenative or granular synthesis to resynthesize the output of the model into a continuous signal.
+The similarity algorithm can be repurposed to operate on time-series rather than spectral data which then can be used to generate control envelopes using concatenative or granular synthesis to resynthesize the output of the model into a continuous signal.
 
 Currently we are developing a synthetic body for the Halldorophone as well as a eurorack module based implementation of the convolution algorithm.
-
 
 # training
 
