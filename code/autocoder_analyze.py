@@ -115,7 +115,6 @@ if(sys.argv[1] == '-help' or sys.argv[1] == '-h'):
     print()
     exit()
 
-
 elif(sys.argv[1] == '-analyze' or sys.argv[1] == '-a'):
 
     print()
@@ -203,6 +202,117 @@ elif(sys.argv[1] == '-analyze' or sys.argv[1] == '-a'):
         minin, maxin = ac.analyze_data(imported_data, filename, fftsize, windowskip, input_dim, window, mel_filter)
         ac.write_minmax(filename, minin, maxin)
 
+
+elif(sys.argv[1] == '-at' or sys.argv[1] == '-at'):
+
+    print()
+    print("------------------------------")
+    print("|     ANALYZE AND TRAIN      |")
+    print("------------------------------")
+    print()
+    filename = sys.argv[2]
+    averaging = False
+    first_frame = False
+    if(os.path.isdir(filename)):
+        if(os.path.exists(os.path.join(sys.argv[2], "combined.wav"))):
+            os.remove(os.path.join(sys.argv[2], "combined.wav"))
+        n_files = 0
+        if(sys.argv[3] == 'average'):
+            averaging = True
+        elif(sys.argv[3] == 'first'):
+            first_frame = True
+        else:
+            n_frames = int(sys.argv[3]) #50
+
+
+        for file in os.listdir(sys.argv[2]):
+            if file.endswith(".wav"):
+                print(file)
+                filename_ = os.path.join(sys.argv[2], file)
+                imported_data = ac.readwave(filename_)
+                mel_filter, mel_inversion_filter, window = ac.initialize(fftsize, input_dim)
+                minin, maxin = ac.analyze_data(imported_data, filename_, fftsize, windowskip, input_dim, window, mel_filter)
+                ac.write_minmax(filename_, minin, maxin)
+                n_files = n_files + 1
+
+        n = 0
+        output = 0
+        filenames = np.zeros(n_files, dtype = object)
+        if(averaging != True and first_frame != True):
+            output = np.zeros((n_files * n_frames, input_dim))
+            for file in os.listdir(sys.argv[2]):
+                if file.endswith(".wav"):
+                    filenames[n] = file
+                    filename_ = os.path.join(sys.argv[2], file)
+                    imported_data = ac.import_training_data(filename_)
+                    frames = imported_data[np.random.randint(0, imported_data.shape[0], n_frames)]
+                    output[n:(n + n_frames),] = frames
+                    n = n + 1
+                    os.remove(filename_ + ".npy")
+                    os.remove(filename_ + ".minmax")
+        elif (averaging == True):
+            output = np.zeros((n_files, input_dim))
+            for file in os.listdir(sys.argv[2]):
+                if file.endswith(".wav"):
+                    filenames[n] = file
+                    filename_ = os.path.join(sys.argv[2], file)
+                    imported_data = ac.import_training_data(filename_)
+                    output[n,] = np.sum(imported_data, axis = 0) / imported_data.shape[0]
+                    n = n + 1
+                    os.remove(filename_ + ".npy")
+                    os.remove(filename_ + ".minmax")
+        elif (first_frame == True):
+            output = np.zeros((n_files, input_dim))
+            for file in os.listdir(sys.argv[2]):
+                if file.endswith(".wav"):
+                    print(file)
+                    filenames[n] = file
+                    filename_ = os.path.join(sys.argv[2], file)
+                    imported_data = ac.import_training_data(filename_)
+                    output[n,] = imported_data[0,]
+                    n = n + 1
+                    os.remove(filename_ + ".npy")
+                    os.remove(filename_ + ".minmax")
+        print(filenames)
+        output = ac.scale_array_by_amax(output)
+        filename_ = os.path.join(sys.argv[2], "combined.wav")
+        f = open(filename_, "w")
+        f.close()
+        ac.write_minmax(filename_, minin, maxin)
+        np.save(filename_ + ".npy", output)
+        f = open(filename_ + ".txt", "w")
+        for i in range(0, filenames.shape[0]):
+            f.write(str(i) + ", " + filenames[i] + ";")
+        f.close()
+    else:
+        imported_data = ac.readwave(filename)
+        mel_filter, mel_inversion_filter, window = ac.initialize(fftsize, input_dim)
+        minin, maxin = ac.analyze_data(imported_data, filename, fftsize, windowskip, input_dim, window, mel_filter)
+        ac.write_minmax(filename, minin, maxin)
+
+    if(len(sys.argv) > 4):
+        regression_patience = int(sys.argv[4])
+
+    if(len(sys.argv) > 6):
+        learning_rate = float(sys.argv[5])
+        min_delta = float(sys.argv[6])
+
+    filename_ = sys.argv[2]
+    deep = int(sys.argv[3])
+    input_data = ac.import_training_data(filename_)
+    minin, maxin = ac.read_minmax(filename_)
+
+    if(deep == 0):
+        vae, encoder, decoder = ac.init_autoencoder_shallow(input_dim, intermediate_dim, encoded_dim, learning_rate)
+    else:
+        vae, encoder, decoder = ac.init_autoencoder_deep(input_dim, intermediate_dim, encoded_dim, learning_rate)
+
+    vae, encoder, decoder, scale_mult, scale_subtract = ac.train(filename_, vae, encoder, decoder, input_data, min_delta, regression_patience, ac.get_batch_size(), deep)
+
+    ac.write_mm(filename_, minin, maxin, scale_mult, scale_subtract, input_dim, intermediate_dim, encoded_dim, deep)
+
+
+
 if(sys.argv[1] == '-analyze_normalized' or sys.argv[1] == '-an'):
 
     print()
@@ -237,13 +347,39 @@ elif(sys.argv[1] == '-t'):
     minin, maxin = ac.read_minmax(filename_)
 
     if(deep == 0):
-        vae, encoder, decoder = ac.init_autoencoder_shallow(input_dim, intermediate_dim, encoded_dim, learning_rate)
+        vae, encoder, decoder, training_decoder = ac.init_autoencoder_shallow(input_dim, intermediate_dim, encoded_dim, learning_rate)
     else:
         vae, encoder, decoder = ac.init_autoencoder_deep(input_dim, intermediate_dim, encoded_dim, learning_rate)
 
-    vae, encoder, decoder, scale_mult, scale_subtract = ac.train(filename_, vae, encoder, decoder, input_data, min_delta, regression_patience, ac.get_batch_size(), deep)
+    vae, encoder, decoder, training_decoder, scale_mult, scale_subtract = ac.train(filename_, vae, encoder, decoder, training_decoder, input_data, min_delta, regression_patience, 256, deep)#ac.get_batch_size(), deep)
 
     ac.write_mm(filename_, minin, maxin, scale_mult, scale_subtract, input_dim, intermediate_dim, encoded_dim, deep)
+
+elif(sys.argv[1] == '-tf'):
+
+    print()
+    print("------------------------------")
+    print("|  TRAINING MEL CONVERSION   |")
+    print("------------------------------")
+    print()
+
+    if(len(sys.argv) > 4):
+        regression_patience = int(sys.argv[4])
+    print(".... ", regression_patience)
+
+    if(len(sys.argv) > 6):
+        learning_rate = float(sys.argv[5])
+        min_delta = float(sys.argv[6])
+
+    filename_ = sys.argv[2]
+    deep = int(sys.argv[3])
+    input_data = ac.import_training_data(filename_)
+    output_data = ac.import_training_data(filename_ + ".fft")
+    minin, maxin = ac.read_minmax(filename_)
+
+    ae = ac.init_converter(512, 8192, 64, learning_rate)
+    ac.train_converter(filename_, ae, input_data, output_data, min_delta, regression_patience, ac.get_batch_size())
+
 
 elif(sys.argv[1] == '-encode' or sys.argv[1] == '-e'):
 

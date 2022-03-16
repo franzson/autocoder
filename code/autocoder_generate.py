@@ -3,7 +3,10 @@ import autocoderlib as ac
 import numpy as np
 import math
 import scipy
-import pyaudio
+try:
+    import pyaudio
+except ImportError as e:
+    pass
 import time
 import random
 
@@ -159,7 +162,29 @@ def autocode(in_data, offset, scale, reorder, norm_min, norm_max):
 
     return(np.multiply(np.fft.irfft(co), window))
 
-if(sys.argv[1] == "-play" or sys.argv[1] == "-p"):
+if(sys.argv[1] == '-test'):
+    # read parameters
+    minin, maxin, scale_mult, scale_subtract, input_dim, intermediate_dim, encoded_dim, deep = ac.read_mm(sys.argv[2])
+    # load both models
+    decoder, input_details, output_details = ac.load_lite(sys.argv[2], "decoder")
+    fft_decoder, fft_input_details, fft_output_details = ac.load_lite(sys.argv[2] + ".fft", "decoder")
+    mel_filter, mel_inversion_filter, window = ac.initialize(4096, input_dim)
+    print("")
+    print(input_details)
+    print("")
+    print(output_details)
+    print("")
+    print(fft_input_details)
+    print("")
+    print(fft_output_details)
+    print("")
+    p_m = ac.decode(decoder, 0, scale_mult, scale_subtract, [0, 0, 0, 0, 0, 0, 0, 0])
+    print(p_m)
+    print("")
+    p_n = ac.decode(fft_decoder, 2, scale_mult, scale_subtract, [0, 0, 0, 0, 0, 0, 0, 0])
+    print(p_n[0:256])
+
+elif(sys.argv[1] == "-play" or sys.argv[1] == "-p"):
 
     print("")
     print("------------------------------")

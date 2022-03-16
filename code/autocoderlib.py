@@ -12,7 +12,11 @@ import scipy.io.wavfile
 import scipy
 from scipy.signal import hann
 import math
-import librosa
+try:
+    #import librosa
+    import librosa_load as librosa
+except ImportError as e:
+    pass
 from python_speech_features.base import get_filterbanks
 from typing import List, Any
 import platform
@@ -90,7 +94,7 @@ def get_batch_size():
 
     else:
         print("... setting batch size to 32 for a generic system ...")
-        batch_size = 32
+        batch_size = 8192
 
     return(batch_size)
 
@@ -140,6 +144,8 @@ def initialize(size, melsize):
     window = np.ascontiguousarray(window)
     window[0,] = hann(size)
     mel_filter, mel_inversion_filter = create_mel_filter(size, melsize, 0, 22050, 44100)
+    np.nan_to_num(mel_filter, False, nan = 0.0)
+    np.nan_to_num(mel_inversion_filter, False, nan = 0.0)
     return(mel_filter, mel_inversion_filter, window)
 
 def analyze(data, window, mel_filter):
@@ -149,7 +155,7 @@ def analyze(data, window, mel_filter):
     ampslize = np.ascontiguousarray(ampslize)
     #phase = np.angle(fftdata)
     melslize = spectrogram_to_mel(ampslize[0,0:int(data.shape[1]/2)], mel_filter)
-    return(melslize)
+    return(melslize, ampslize[0,0:int(data.shape[1]/2)])
 
 def analyze_with_phase(data, window, mel_filter):
     data = np.multiply(data, window)
@@ -177,18 +183,21 @@ def analyze_data(data, filename, fftsize, windowskip, melsize, window, mel_filte
     n_slizes = round(len(data)/windowskip)
     output = np.zeros((int((n_slizes - 16))+1, melsize))
     output = np.ascontiguousarray(output)
+    fft_output = np.zeros((int((n_slizes - 16))+1, int(fftsize / 2)))
+    fft_output = np.ascontiguousarray(fft_output)
 
     in_slize = np.zeros((1, fftsize))
     in_slize = np.ascontiguousarray(in_slize)
     for i in range(0, (n_slizes - 16)):
         in_slize[0] = data[i * windowskip:((i*windowskip) + fftsize)]
-        output[i,:] = analyze(in_slize, window, mel_filter)
+        output[i,:], fft_output[i,:] = analyze(in_slize, window, mel_filter)
 
     output = np.nan_to_num(output, 0.)
     minin, maxin = get_aminmax(output)
     output = scale_array_by_amax(output)
 
     np.save(filename + ".npy", output)
+    #np.save(filename + ".fft.npy", fft_output)
     return(minin, maxin)
 
 def analyze_data_normalized(data, filename, fftsize, windowskip, melsize, window, mel_filter):
@@ -272,14 +281,21 @@ def init_autoencoder_shallow(input_dim, intermediate_dim, encoded_dim, learning_
     outputs = tf.keras.layers.Dense(input_dim, activation='sigmoid')(x)
 
     # instantiate decoder model
-    decoder = tf.keras.Model(latent_inputs, outputs, name='decoder')
+    _,mel_inversion_filter = create_mel_filter(8192, input_dim, 0, 22050, 44100)
+    mel = K.expand_dims(tf.constant(mel_inversion_filter), 0)
+    transformed_outputs = tf.keras.layers.Dot(axes=(1,1)) ([outputs, mel])
+    decoder = tf.keras.Model(latent_inputs, transformed_outputs, name='decoder')
+    training_decoder = tf.keras.Model(latent_inputs, outputs, name='training_decoder')
     decoder.summary()
-
+    training_decoder.summary()
     # instantiate VAE model
+    training_outputs = training_decoder(encoder(inputs)[2])
     outputs = decoder(encoder(inputs)[2])
-    vae = tf.keras.Model(inputs, outputs, name='vae_mlp')
 
-    reconstruction_loss = tf.keras.losses.binary_crossentropy(inputs, outputs)
+
+    vae = tf.keras.Model(inputs, [training_outputs,outputs], name='vae_mlp')
+
+    reconstruction_loss = tf.keras.losses.binary_crossentropy(inputs, training_outputs)
 
     reconstruction_loss *= input_dim
     kl_loss = 1 + z_log_var - K.square(z_mean) - K.exp(z_log_var)
@@ -290,7 +306,8 @@ def init_autoencoder_shallow(input_dim, intermediate_dim, encoded_dim, learning_
     opt = tf.keras.optimizers.Adam(lr=learning_rate)
 
     vae.compile(optimizer=opt)
-    return(vae, encoder, decoder)
+    return(vae, encoder, decoder, training_decoder)
+
 
  #############################
  #         DEEP MODEL        #
@@ -372,7 +389,7 @@ def init_autoencoder_deep(input_dim, intermediate_dim, encoded_dim, learning_rat
  #       TRAINING LOOP       #
  #############################
 
-def train(filename, vae, encoder, decoder, input, min_delta, regression_patience = 1, batch_size = 4096, deep = 0):
+def train(filename, vae, encoder, decoder, training_decoder, input, min_delta, regression_patience = 1, batch_size = 4096, deep = 0):
 
     tf.executing_eagerly()
     es = tf.keras.callbacks.EarlyStopping(monitor='loss', mode='min', min_delta=min_delta, patience = regression_patience)
@@ -382,18 +399,50 @@ def train(filename, vae, encoder, decoder, input, min_delta, regression_patience
 
     vae.save_weights(filename + ".h5")
     scale_mult, scale_subtract = get_minmax(encoder, input)
+    #fft_mult, fft_subtract = get_fft_minmax(vae, input)
+
     converter_enc = tf.lite.TFLiteConverter.from_keras_model(encoder)
     converter_dec = tf.lite.TFLiteConverter.from_keras_model(decoder)
+    converter_training_dec = tf.lite.TFLiteConverter.from_keras_model(training_decoder)
     tflite_model_enc = converter_enc.convert()
     tflite_model_dec = converter_dec.convert()
+    tflite_model_training_dec = converter_training_dec.convert()
 
     # Save the models
     with open(filename + '.enc', 'wb') as f:
       f.write(tflite_model_enc)
-    with open(filename + '.dec', 'wb') as f:
+    with open(filename + '.fft.dec', 'wb') as f:
       f.write(tflite_model_dec)
+    with open(filename + '.dec', 'wb') as f:
+      f.write(tflite_model_training_dec)
 
-    return(vae, encoder, decoder, scale_mult, scale_subtract)
+    return(vae, encoder, decoder, training_decoder, scale_mult, scale_subtract)
+
+
+def train_converter(filename, ae, input, output, min_delta, regression_patience = 1, batch_size = 4096, deep = 0):
+
+    print("regression patience: ", regression_patience)
+
+    tf.executing_eagerly()
+    es = tf.keras.callbacks.EarlyStopping(monitor='loss', mode='min', min_delta=min_delta, patience = regression_patience)
+    history = ae.fit(x=input, y=output,
+            batch_size = batch_size,
+            epochs=50000, verbose = 1, callbacks=[es])
+
+    ae.save_weights(filename + ".fft.h5")
+    #scale_mult, scale_subtract = get_minmax(encoder, input)
+    #converter_enc = tf.lite.TFLiteConverter.from_keras_model(encoder)
+    #converter_dec = tf.lite.TFLiteConverter.from_keras_model(decoder)
+    #tflite_model_enc = converter_enc.convert()
+    #tflite_model_dec = converter_dec.convert()
+
+    # Save the models
+    #with open(filename + '.fft.enc', 'wb') as f:
+    #  f.write(tflite_model_enc)
+    #with open(filename + '.fft.dec', 'wb') as f:
+    #  f.write(tflite_model_dec)
+
+    return(ae)
 
 #############################
 #     SCALING FUNCTIONS     #
@@ -421,6 +470,18 @@ def get_minmax(encoder, input):
     scale_mult = np.subtract(max, min)
     scale_subtract = min
     return(scale_mult, scale_subtract)
+'''
+def get_fft_minmax(vae, input):
+    parsed = vae.predict(input)
+    parsed = np.asarray(parsed[1], dtype = np.float32)
+    print(parsed.shape)
+
+    min = np.amin(parsed)
+    max = np.amax(parsed)
+    fft_mult = np.subtract(max, min)
+    fft_subtract = min
+    return(fft_mult, fft_subtract)
+'''
 
 def write_minmax(filename, minin, maxin):
 #    output_ = np.zeros([1, 2])
@@ -479,7 +540,12 @@ def load_lite(filename_, type):    # SIMPLY CALL IT WITH EITHER THE ENCODER OR D
     return(interpreter, input_details, output_details)
 
 def decode(interpreter, deep, scale_mult, scale_subtract, *args: List[Any]):   # decoder, encoded_dim, scale_mult, scale_subtract, data
-    return(code(interpreter, deep, 7 if (deep == 0) else 25, rescale(args[0], scale_mult, scale_subtract).astype(np.float32)))
+    layer_index = 7
+    if(deep == 1):
+        layer_index = 25
+    elif(deep == 2):
+        layer_index = 13
+    return(code(interpreter, deep, layer_index, rescale(args[0], scale_mult, scale_subtract).astype(np.float32)))
 
 def encode(interpreter, deep, scale_mult, scale_subtract, *args:List[Any]):
     return(inverse_rescale(code(interpreter, deep, 15 if (deep == 0) else 29, args[0]), scale_mult, scale_subtract))
