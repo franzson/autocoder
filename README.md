@@ -10,35 +10,35 @@ The following is for installing the full autocoder toolchain. This is only recom
 
 For basic usage, you will need python 3.7+, Tensorflow and Numpy
 Tensorflow 2.4+
-	Mac OS 12+: https://developer.apple.com/metal/tensorflow-plugin/
+<pre>	Mac OS 12+: https://developer.apple.com/metal/tensorflow-plugin/
 	Other: https://www.tensorflow.org/install
 For a lighter version, the generative parts of the code can be used with a tflite_runtime install
 	https://www.tensorflow.org/lite/guide/python
-Numpy: python3 -m pip install numpy
+Numpy: python3 -m pip install numpy</pre>
 
 Depending on features required, you will need some or all of the following:
-Scipy: python3 -m pip install scipy
-PyAudio: python3 -m pip install pyaudio
+<pre>Scipy: python3 -m pip install scipy
+PyAudio: python3 -m pip install pyaudio</pre>
 Python Speech Features: python3 -m pip install python-speech-features
-librosa: python3 -m pip install librosa
+
 
 On Mac OS 12+, some packages might be easier to install using conda.
 
 Download the code and run one of the following:
-python3 ./autocoder_analyze.py -h
+<pre>python3 ./autocoder_analyze.py -h
 	This file contains analysis and training functions.
 python3 ./autocoder_generate.py -h
 	This file contains various generative functions.
 python3 ./autocoder_remote.py -h
 	This file contains and OSC interface to the model.
 python3 ./autocoderlib.py -api
-	This file contains the actual model and helper functions.
+	This file contains the actual model and helper functions.</pre>
 
 A very simple Max/MSP demo patch is included in /maxmsp. This patch requires spat5 (https://forum.ircam.fr/projects/detail/spat/) to be installed.
 
 A google colab (https://colab.research.google.com/) training script is included in /colab. You can use a chrome extension called 'Open in Colab'  to move the script over.  It is highly recommended to use colab for any heavier training as cpu training can be relatively slow.
 
-A test model is included in /models.
+Test models are available [here](https://github.com/franzson/autocoder_models).
 
 # autoencoders
 
@@ -51,8 +51,6 @@ The network consists of two separate parts: an encoder that takes the training d
 The encoder and decoder can be used separately from one another to either encode a sound into a compressed format––e.g. for sound similarity judgement––or to decode an arbitrary or synthetic latent vector, generating new spectra based on the spectral space of the training data.
 
 # variational autoencoder
-
-The latent vector space of an autoencoder can easily become lumpy as the model is blind to the internal structure of the latent vector, and as a result, minor changes in the latent space can produce wild variations in the output of the decoder, rendering it hard to control as a generative tool and making distances between any two latent vectors dependent on the magnitude  of their values (i.e. the distance between 0 and .1 might be 10x larger  than the distance between 0.9 and 1).
 
 By constraining the model to fit a probability distribution in the latent vector layer, the latent vector can be forced to describe any input as a point on a smooth/continuous plane. The model is in a sense representing a smooth surface in the input dimensions onto which each point in the training data can be mapped via its latent representation.
 
@@ -70,9 +68,9 @@ Without further processing, spectral data is fairly useless as training data for
 
 A similar problem arises with phase. The spectral amplitude, or the relationship between amplitudes along the spectrum are absolute values, while the phase can be rotated and cuts off  as it crosses either Pi or -Pi, making both raw phase and phase–difference hard to train on without some clever cooking of the raw data. [This shouldn't be hard to add into the model and I would be very interested in any thoughts for solutions on this problem].
 
-To work around these two problems, the phase information is thrown out, and the amplitude of the spectrum is converted to a mel-frequency cepstrum (MFCC), a linear transform of the log distribution of energy in the spectrum. In the MFCC, each octave is represented by an equal number of values so that the noise modeling problem becomes moot.
+To work around these two problems, the phase information is thrown out, and the amplitude of the spectrum is converted to mel, a linear transform of the log distribution of energy in the spectrum. In the Mel transform, each octave is represented by an equal number of values so that the noise modeling problem becomes moot.
 
-Converting the data to MFCC also allows for a large compression of the input spectrum, from 8192 points for an FFT window size of 16384 down to 512 points. Another advantage of the MFCC conversion is that the mel space can be unpacked to any arbitrary FFT window size, allowing for the input and output FFT size to be different from one another with limited loss of information.
+Converting the data to Mel also allows for a large compression of the input spectrum, from 8192 points for an FFT window size of 16384 down to 512 points. Another advantage of the MFCC conversion is that the mel space can be unpacked to any arbitrary FFT window size, allowing for the input and output FFT size to be different from one another with limited loss of information.
 
 The data set is then normalized and fed into the encoder network. 
 
@@ -94,7 +92,7 @@ By feeding arbitrary values as input into the latent vector layer, the encoder r
 
 The various scripts use the name of the original sound file as a way of keeping track of various specialized files between functions.
 
-To create a training set:
+<pre>To create a training set:
 python3 ./autocoder_analyze.py -a 'input_file.wav'
 
 To create a training set from a folder of files with n frames from each file, feed it the folder and a number:
@@ -118,7 +116,7 @@ To calculate distances across the frames of the training set.
 python3 ./autocoder_analyze.py -e 'input_file.wav'
 Followed by:
 python3 ./autocoder_analyze.py -d 'input_file.wav' n_of_most_similar
-	(n_of_most_similar can be any number between 1 and the number of files in the folder - 1).
+	(n_of_most_similar can be any number between 1 and the number of files in the folder - 1).</pre>
 
 The resulting models can then be used with either ./autocoder_generate.py and ./autocoder_remote.py
 
