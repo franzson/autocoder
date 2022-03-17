@@ -10,16 +10,14 @@ The following is for installing the full autocoder toolchain. This is only recom
 
 For basic usage, you will need python 3.7+, Tensorflow and Numpy
 Tensorflow 2.4+
-<pre>	Mac OS 12+: https://developer.apple.com/metal/tensorflow-plugin/
-	Other: https://www.tensorflow.org/install
-For a lighter version, the generative parts of the code can be used with a tflite_runtime install
-	https://www.tensorflow.org/lite/guide/python
+<pre>Mac OS 12+: https://developer.apple.com/metal/tensorflow-plugin/
+Other: https://www.tensorflow.org/install For a lighter version, the generative parts of the code can be used with a tflite_runtime install https://www.tensorflow.org/lite/guide/python
 Numpy: python3 -m pip install numpy</pre>
 
 Depending on features required, you will need some or all of the following:
 <pre>Scipy: python3 -m pip install scipy
-PyAudio: python3 -m pip install pyaudio</pre>
-Python Speech Features: python3 -m pip install python-speech-features
+PyAudio: python3 -m pip install pyaudio
+Python Speech Features: python3 -m pip install python-speech-features</pre>
 
 
 On Mac OS 12+, some packages might be easier to install using conda.
